@@ -1,0 +1,1419 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>수행평가 성적 확인 시스템 (보안 강화 및 평가 자유 설정)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SheetJS CDN (Excel handling) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+        }
+        .tab-active {
+            border-bottom: 3px solid #4f46e5;
+            color: #4338ca;
+            font-weight: 700;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Header Navigation -->
+    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="showView('home')">
+                <div class="p-2 bg-indigo-600 rounded-xl shadow-md">
+                    <i data-lucide="shield-check" class="w-6 h-6 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight flex items-center space-x-2">
+                        <span>수행평가 성적 조회 시스템</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">학생 개별 성적 및 피드백 안전 확인</p>
+                </div>
+            </div>
+            
+            <div id="navButtons" class="flex items-center space-x-2">
+                <!-- Dynamic Navigation Buttons -->
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-grow max-w-6xl w-full mx-auto p-4 sm:p-6">
+
+        <!-- Notification Toast -->
+        <div id="toast" class="hidden fixed bottom-5 right-5 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl z-50 transition-all duration-300 flex items-center space-x-2 border border-slate-700">
+            <i id="toastIcon" data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>
+            <span id="toastMsg" class="text-sm">알림 메시지입니다.</span>
+        </div>
+
+        <!-- 1. HOME / STUDENT LOGIN VIEW -->
+        <section id="view-home" class="space-y-8 py-8">
+            <div class="text-center max-w-xl mx-auto space-y-3">
+                <span class="bg-indigo-100 text-indigo-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider inline-flex items-center gap-1">
+                    <i data-lucide="lock" class="w-3 h-3"></i> 보안 인증 로그인
+                </span>
+                <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">수행평가 결과 조회</h2>
+                <p class="text-slate-600 text-sm">본인의 학번, 이름 및 개인 비밀번호를 입력하여 성적을 확인하세요.</p>
+            </div>
+
+            <div class="max-w-md mx-auto">
+                <!-- Student Card -->
+                <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200/80 space-y-6">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center font-bold">
+                                <i data-lucide="user-check" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-bold text-slate-800">학생 성적 본인 조회</h3>
+                                <p class="text-slate-400 text-xs">개인정보 보호 적용 시스템</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form id="studentLoginForm" onsubmit="handleStudentLogin(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">학번</label>
+                            <input type="text" id="loginStudentId" required placeholder="예: 10101" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">이름</label>
+                            <input type="text" id="loginStudentName" required placeholder="성명 입력" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">개인 비밀번호</label>
+                            <input type="password" id="loginStudentPw" required placeholder="비밀번호 입력 (최초 로그인: 0000)" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition text-sm">
+                            <p class="text-[11px] text-slate-400 mt-1">* 처음 진입 시 0000 입력 후 본인 비밀번호로 변경합니다.</p>
+                        </div>
+                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl transition shadow-lg shadow-indigo-200 flex items-center justify-center space-x-2 text-sm">
+                            <span>성적 조회하기</span>
+                            <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. TEACHER LOGIN MODAL -->
+        <div id="teacherLoginModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl max-w-sm w-full p-6 space-y-5 shadow-2xl border border-slate-100">
+                <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                    <div class="flex items-center space-x-2">
+                        <i data-lucide="key-round" class="w-5 h-5 text-amber-500"></i>
+                        <h3 class="text-base font-bold text-slate-800">교사 관리자 인증</h3>
+                    </div>
+                    <button onclick="closeTeacherModal()" class="text-slate-400 hover:text-slate-600">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <form id="teacherLoginForm" onsubmit="handleTeacherLogin(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">교사 전용 암호</label>
+                        <input type="password" id="teacherPassword" required placeholder="비밀번호 입력" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-slate-800 outline-none transition text-sm">
+                    </div>
+                    <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-medium py-2.5 rounded-xl transition shadow flex items-center justify-center space-x-2 text-sm">
+                        <i data-lucide="lock" class="w-4 h-4"></i>
+                        <span>관리자 로그인</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 3. STUDENT PASSWORD CHANGE MODAL -->
+        <div id="changePasswordModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl max-w-sm w-full p-6 space-y-5 shadow-2xl border border-slate-100">
+                <div class="text-center space-y-2">
+                    <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+                        <i data-lucide="shield-alert" class="w-6 h-6"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-900">비밀번호 변경 필요</h3>
+                    <p class="text-xs text-slate-500">초기 비밀번호(0000)를 사용 중입니다.<br>본인 확인을 위해 새로운 숫자 4자리 비밀번호를 설정해주세요.</p>
+                </div>
+
+                <form id="changePasswordForm" onsubmit="handlePasswordChangeSubmit(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">새 비밀번호 (숫자 4자리)</label>
+                        <input type="password" id="newStudentPw" required maxlength="4" pattern="\d{4}" placeholder="숫자 4자리 입력" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none text-center font-mono text-lg tracking-widest">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">새 비밀번호 확인</label>
+                        <input type="password" id="confirmStudentPw" required maxlength="4" pattern="\d{4}" placeholder="한 번 더 입력" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none text-center font-mono text-lg tracking-widest">
+                    </div>
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl transition shadow flex items-center justify-center space-x-2 text-sm">
+                        <i data-lucide="check" class="w-4 h-4"></i>
+                        <span>비밀번호 변경 완료</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 4. CUSTOM CONFIRMATION MODAL -->
+        <div id="customConfirmModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl border border-slate-100 text-center">
+                <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto">
+                    <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900" id="confirmModalTitle">확인</h3>
+                    <p class="text-xs text-slate-500 mt-1.5 leading-relaxed" id="confirmModalMsg">정말로 이 작업을 진행하시겠습니까?</p>
+                </div>
+                <div class="flex space-x-2 pt-2">
+                    <button id="confirmCancelBtn" onclick="closeCustomConfirm(false)" class="w-1/2 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50 transition">취소</button>
+                    <button id="confirmOkBtn" class="w-1/2 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold transition shadow shadow-rose-200">확인</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. STUDENT DASHBOARD VIEW -->
+        <section id="view-student" class="hidden space-y-6">
+            <!-- Student Banner -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div class="flex items-center space-x-4">
+                    <div class="w-14 h-14 bg-indigo-100 text-indigo-700 font-bold text-xl rounded-2xl flex items-center justify-center border border-indigo-200">
+                        <span id="studentAvatar">학</span>
+                    </div>
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <h2 class="text-2xl font-bold text-slate-800" id="studentDisplayName">김학생</h2>
+                            <span class="bg-indigo-50 text-indigo-700 text-xs px-2.5 py-1 rounded-md font-semibold border border-indigo-200" id="studentDisplayId">10101</span>
+                        </div>
+                        <p class="text-slate-500 text-xs sm:text-sm mt-0.5">본인의 평가 성적 및 선생님의 피드백을 확인하세요.</p>
+                    </div>
+                </div>
+                <button onclick="logout()" class="text-slate-500 hover:text-slate-800 hover:bg-slate-100 px-3.5 py-2 rounded-xl text-sm transition flex items-center space-x-1.5 border border-slate-200">
+                    <i data-lucide="log-out" class="w-4 h-4"></i>
+                    <span>로그아웃</span>
+                </button>
+            </div>
+
+            <!-- Evaluation Navigation Tabs -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="border-b border-slate-200 px-4 pt-3 flex space-x-2 overflow-x-auto" id="studentEvalTabs">
+                    <!-- Dynamic Tabs loaded via JS -->
+                </div>
+
+                <!-- Tab Content Area -->
+                <div class="p-6 space-y-6" id="studentEvalContent">
+                    <!-- Dynamic evaluation details loaded via JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- 6. TEACHER ADMIN DASHBOARD VIEW -->
+        <section id="view-teacher" class="hidden space-y-6">
+            <!-- Admin Header Banner -->
+            <div class="bg-slate-900 text-white p-6 rounded-2xl shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <span class="bg-amber-500 text-slate-950 font-bold text-xs px-2 py-0.5 rounded">ADMIN</span>
+                        <h2 class="text-2xl font-bold">수행평가 관리자 시스템</h2>
+                    </div>
+                    <p class="text-slate-400 text-sm mt-1">평가 항목 수정, 엑셀 명단 등록, 학생 비밀번호 및 피드백을 관리합니다.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button onclick="openConfigModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm px-3.5 py-2 rounded-xl font-medium transition flex items-center space-x-1.5 shadow">
+                        <i data-lucide="settings" class="w-4 h-4"></i>
+                        <span>평가 영역 설정</span>
+                    </button>
+                    <button onclick="downloadSampleExcel()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm px-3.5 py-2 rounded-xl border border-slate-700 transition flex items-center space-x-1.5">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                        <span>엑셀 서식 다운로드</span>
+                    </button>
+                    <label class="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm px-3.5 py-2 rounded-xl font-medium transition flex items-center space-x-1.5 shadow">
+                        <i data-lucide="upload" class="w-4 h-4"></i>
+                        <span>엑셀 업로드 (.xlsx)</span>
+                        <input type="file" id="excelInput" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleFileUpload(event)">
+                    </label>
+                    <button onclick="logout()" class="text-slate-400 hover:text-white p-2 rounded-xl transition bg-slate-800 border border-slate-700">
+                        <i data-lucide="log-out" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Admin Sub-navigation Tabs -->
+            <div class="flex border-b border-slate-200 space-x-4">
+                <button onclick="switchAdminTab('students')" id="adminTabBtn-students" class="pb-3 text-sm font-semibold border-b-2 border-indigo-600 text-indigo-600 flex items-center space-x-2">
+                    <i data-lucide="users" class="w-4 h-4"></i>
+                    <span>학생 성적 및 비밀번호 관리</span>
+                </button>
+                <button onclick="switchAdminTab('comments')" id="adminTabBtn-comments" class="pb-3 text-sm font-semibold text-slate-500 hover:text-slate-800 flex items-center space-x-2">
+                    <i data-lucide="message-square" class="w-4 h-4"></i>
+                    <span>학생 질문 / 제출 소감 목록</span>
+                    <span id="commentBadge" class="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-bold">0</span>
+                </button>
+            </div>
+
+            <!-- TAB 1: Student List & Score Management -->
+            <div id="adminTab-students" class="space-y-4">
+                <!-- Controls Bar -->
+                <div class="flex flex-col sm:flex-row justify-between items-center gap-3 bg-white p-4 rounded-xl border border-slate-200">
+                    <div class="relative w-full sm:w-72">
+                        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+                        <input type="text" id="adminSearch" oninput="renderAdminTable()" placeholder="학번 또는 이름 검색..." class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
+                        <button onclick="deleteSelectedStudents()" class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs sm:text-sm px-3 py-2 rounded-lg transition flex items-center space-x-1">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            <span>선택 삭제</span>
+                        </button>
+                        <button onclick="openAddStudentModal()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs sm:text-sm px-3.5 py-2 rounded-lg transition flex items-center space-x-1">
+                            <i data-lucide="plus" class="w-4 h-4"></i>
+                            <span>학생 개별 추가</span>
+                        </button>
+                        <button onclick="resetDataToDefault()" class="text-slate-500 hover:bg-slate-100 border border-slate-200 text-xs sm:text-sm px-3 py-2 rounded-lg transition">
+                            샘플데이터 초기화
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Main Data Table -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200" id="adminTableHeader">
+                                <!-- Dynamic Headers -->
+                            </thead>
+                            <tbody id="adminTableBody" class="divide-y divide-slate-200 text-slate-700">
+                                <!-- Dynamic rows rendered via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: Student Comments Management -->
+            <div id="adminTab-comments" class="hidden space-y-4">
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center space-x-2">
+                        <i data-lucide="messages-square" class="w-5 h-5 text-indigo-600"></i>
+                        <span>학생들이 작성한 질문 및 소감 목록</span>
+                    </h3>
+                    <div id="studentCommentsList" class="space-y-4">
+                        <!-- Dynamic comments rendered via JS -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal 1: Edit / Add Student -->
+    <div id="studentModal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-2xl w-full p-6 space-y-6 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-slate-200 pb-3">
+                <h3 class="text-lg font-bold text-slate-800" id="modalTitle">학생 정보 수정</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form id="studentModalForm" onsubmit="saveStudentModal(event)" class="space-y-4">
+                <input type="hidden" id="editOriginalId">
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">학번</label>
+                        <input type="text" id="modalStudentId" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">이름</label>
+                        <input type="text" id="modalStudentName" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">개인 비밀번호</label>
+                        <input type="text" id="modalStudentPassword" required placeholder="비밀번호 지정" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono">
+                    </div>
+                </div>
+
+                <hr class="my-2 border-slate-200">
+
+                <!-- Dynamic Evaluation Forms -->
+                <div id="modalEvalsContainer" class="space-y-4">
+                    <!-- Populated dynamically -->
+                </div>
+
+                <div class="flex justify-end space-x-2 pt-2">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 border rounded-lg text-sm text-slate-600 hover:bg-slate-100">취소</button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">저장하기</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 2: EVALUATION CONFIGURATION MODAL (평가 영역 관리기) -->
+    <div id="configModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-2xl w-full p-6 space-y-5 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-slate-200 pb-3">
+                <div class="flex items-center space-x-2">
+                    <i data-lucide="sliders" class="w-5 h-5 text-indigo-600"></i>
+                    <h3 class="text-lg font-bold text-slate-800">수행평가 영역 자유 설정</h3>
+                </div>
+                <button onclick="closeConfigModal()" class="text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <p class="text-xs text-slate-500">평가 탭의 이름과 세부 항목 및 만점 기준을 자유롭게 추가/수정/삭제할 수 있습니다.</p>
+
+            <div id="configEvalsList" class="space-y-4">
+                <!-- Dynamic config rows rendered via JS -->
+            </div>
+
+            <button onclick="addNewEvalSchema()" class="w-full border-2 border-dashed border-indigo-300 text-indigo-600 hover:bg-indigo-50 font-semibold py-2.5 rounded-xl transition flex items-center justify-center space-x-1 text-sm">
+                <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                <span>새 평가 영역 추가</span>
+            </button>
+
+            <div class="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+                <button type="button" onclick="closeConfigModal()" class="px-4 py-2 border rounded-lg text-sm text-slate-600 hover:bg-slate-100">취소</button>
+                <button type="button" onclick="saveEvalSchemaConfig()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">설정 저장 적용</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 mt-auto">
+        <p>© 수행평가 결과 확인 및 관리 시스템 | 개인정보 암호화 및 타인 조회 방지 적용</p>
+    </footer>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // Teacher Password Constant
+        const TEACHER_SECRET = "0114";
+
+        // Default Evaluation Schema Configuration
+        const DEFAULT_EVAL_SCHEMAS = [
+            {
+                key: "eval1",
+                name: "[1차] 독서록 작성",
+                subNames: ["내용 이해", "비판적 사고", "표현 및 구성"],
+                maxes: [10, 10, 10]
+            },
+            {
+                key: "eval2",
+                name: "[2차] 모둠 발표",
+                subNames: ["발표 전달력", "자료 완성도", "모둠 협동성"],
+                maxes: [10, 10, 10]
+            },
+            {
+                key: "eval3",
+                name: "[3차] 개인 포트폴리오",
+                subNames: ["성실성", "창의성", "과제 제출"],
+                maxes: [15, 15, 10]
+            }
+        ];
+
+        // Default Sample Students Data
+        const DEFAULT_STUDENTS = [
+            {
+                id: "10101",
+                name: "김민준",
+                password: "0000",
+                evaluations: {
+                    eval1: { scores: [9, 10, 9], feedback: "책의 핵심 주제를 정확하게 파악하고 자신의 경험과 연계하여 훌륭하게 작성함." },
+                    eval2: { scores: [10, 9, 8], feedback: "시각 자료 활용도가 높았으나 모둠원 간 역할 분담 비율을 조금 더 균등하게 할 필요가 있음." },
+                    eval3: { scores: [15, 14, 10], feedback: "학기 동안 제출 기한을 완벽히 준수하였으며 내용의 짜임새가 우수함." }
+                },
+                comments: {
+                    eval1: "선생님, 비판적 사고 부분에서 참고할만한 추천 도서가 있을까요?",
+                    eval2: "",
+                    eval3: "한 학기 동안 친절하게 가르쳐주셔서 감사합니다!"
+                }
+            },
+            {
+                id: "10102",
+                name: "이서연",
+                password: "1234",
+                evaluations: {
+                    eval1: { scores: [10, 9, 10], feedback: "문장력이 뛰어나며 독창적인 관점이 돋보이는 우수한 독서록입니다." },
+                    eval2: { scores: [10, 10, 10], feedback: "모둠장으로서 뛰어난 리더십을 발휘하였고 발표 전달력이 매우 우수함." },
+                    eval3: { scores: [14, 15, 10], feedback: "창의적인 요약 방식과 깔끔한 구조화가 인상적입니다." }
+                },
+                comments: {
+                    eval1: "",
+                    eval2: "모둠원들이 너무 잘 협조해줘서 좋은 결과가 나온 것 같습니다.",
+                    eval3: ""
+                }
+            },
+            {
+                id: "10103",
+                name: "박지후",
+                password: "0000",
+                evaluations: {
+                    eval1: { scores: [8, 7, 8], feedback: "전반적으로 잘 작성되었으나 본인의 주장에 대한 근거 제시를 조금 더 보완하면 좋겠습니다." },
+                    eval2: { scores: [8, 9, 9], feedback: "발표 시 목소리 톤과 시선 처리가 자연스러웠습니다." },
+                    eval3: { scores: [12, 11, 8], feedback: "일부 과제 보완 제출이 필요하나 성실히 참여하려는 노력이 보입니다." }
+                },
+                comments: {}
+            }
+        ];
+
+        // Global State
+        let currentRole = null; // 'student' | 'teacher' | null
+        let currentStudent = null; // Currently logged in student object
+        let currentEvalTab = 'eval1';
+        let evalSchemas = [];
+        let studentsData = [];
+        let pendingLoginStudent = null; // Temporary reference for password change flow
+        let onConfirmAction = null; // Callback for Custom Confirm Dialog
+
+        // Custom Confirm Dialog Helper
+        function showCustomConfirm(title, message, okText, onOk) {
+            document.getElementById('confirmModalTitle').textContent = title;
+            document.getElementById('confirmModalMsg').textContent = message;
+            const okBtn = document.getElementById('confirmOkBtn');
+            okBtn.textContent = okText || "확인";
+            
+            onConfirmAction = onOk;
+            document.getElementById('customConfirmModal').classList.remove('hidden');
+        }
+
+        function closeCustomConfirm(isOk) {
+            document.getElementById('customConfirmModal').classList.add('hidden');
+            if (isOk && typeof onConfirmAction === 'function') {
+                onConfirmAction();
+            }
+            onConfirmAction = null;
+        }
+
+        document.getElementById('confirmOkBtn').addEventListener('click', function() {
+            closeCustomConfirm(true);
+        });
+
+        // App Initialization
+        window.onload = function() {
+            lucide.createIcons();
+            loadStoredData();
+            updateNav();
+        };
+
+        // Storage Helper
+        function loadStoredData() {
+            // Load Schemas
+            const storedSchemas = localStorage.getItem('eval_schemas_v3');
+            if (storedSchemas) {
+                try {
+                    evalSchemas = JSON.parse(storedSchemas);
+                } catch(e) {
+                    evalSchemas = JSON.parse(JSON.stringify(DEFAULT_EVAL_SCHEMAS));
+                }
+            } else {
+                evalSchemas = JSON.parse(JSON.stringify(DEFAULT_EVAL_SCHEMAS));
+                saveDataToStorage();
+            }
+
+            // Load Students
+            const storedStudents = localStorage.getItem('eval_students_data_v3');
+            if (storedStudents) {
+                try {
+                    studentsData = JSON.parse(storedStudents);
+                } catch(e) {
+                    studentsData = JSON.parse(JSON.stringify(DEFAULT_STUDENTS));
+                }
+            } else {
+                studentsData = JSON.parse(JSON.stringify(DEFAULT_STUDENTS));
+                saveDataToStorage();
+            }
+        }
+
+        function saveDataToStorage() {
+            localStorage.setItem('eval_schemas_v3', JSON.stringify(evalSchemas));
+            localStorage.setItem('eval_students_data_v3', JSON.stringify(studentsData));
+        }
+
+        function resetDataToDefault() {
+            showCustomConfirm(
+                '데이터 초기화 확인',
+                '모든 성적 데이터 및 평가 설정을 초기 샘플 데이터로 리셋하시겠습니까?',
+                '초기화',
+                function() {
+                    evalSchemas = JSON.parse(JSON.stringify(DEFAULT_EVAL_SCHEMAS));
+                    studentsData = JSON.parse(JSON.stringify(DEFAULT_STUDENTS));
+                    saveDataToStorage();
+                    showToast('초기 데이터로 리셋되었습니다.', 'success');
+                    if (currentRole === 'teacher') {
+                        renderAdminTable();
+                        renderAdminComments();
+                    }
+                }
+            );
+        }
+
+        // View Routing
+        function showView(viewName) {
+            document.getElementById('view-home').classList.add('hidden');
+            document.getElementById('view-student').classList.add('hidden');
+            document.getElementById('view-teacher').classList.add('hidden');
+
+            document.getElementById(`view-${viewName}`).classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            updateNav();
+        }
+
+        function updateNav() {
+            const nav = document.getElementById('navButtons');
+            nav.innerHTML = '';
+
+            if (currentRole === 'student') {
+                nav.innerHTML = `
+                    <span class="text-xs bg-indigo-800 text-indigo-100 px-3 py-1.5 rounded-full font-medium">학생 성적 조회 중</span>
+                    <button onclick="logout()" class="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg transition">로그아웃</button>
+                `;
+            } else if (currentRole === 'teacher') {
+                nav.innerHTML = `
+                    <span class="text-xs bg-amber-500 text-slate-950 font-bold px-3 py-1 rounded-full">교사 관리자</span>
+                    <button onclick="logout()" class="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg transition">로그아웃</button>
+                `;
+            } else {
+                nav.innerHTML = `
+                    <button onclick="openTeacherModal()" class="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg transition flex items-center space-x-1 border border-slate-700 hover:border-slate-500">
+                        <i data-lucide="lock" class="w-3.5 h-3.5"></i>
+                        <span>교사 전용</span>
+                    </button>
+                `;
+            }
+            lucide.createIcons();
+        }
+
+        // Teacher Modal Handlers
+        function openTeacherModal() {
+            document.getElementById('teacherPassword').value = '';
+            document.getElementById('teacherLoginModal').classList.remove('hidden');
+        }
+
+        function closeTeacherModal() {
+            document.getElementById('teacherLoginModal').classList.add('hidden');
+        }
+
+        // Student Auth
+        function handleStudentLogin(e) {
+            e.preventDefault();
+            const sid = document.getElementById('loginStudentId').value.trim();
+            const name = document.getElementById('loginStudentName').value.trim();
+            const pw = document.getElementById('loginStudentPw').value.trim();
+
+            const found = studentsData.find(s => String(s.id) === sid && s.name === name);
+
+            if (!found) {
+                showToast('일치하는 학생 정보를 찾을 수 없습니다.', 'error');
+                return;
+            }
+
+            if (found.password !== pw) {
+                showToast('개인 비밀번호가 올바르지 않습니다.', 'error');
+                return;
+            }
+
+            // Mandatory Password Change on Default "0000" Password
+            if (found.password === "0000") {
+                pendingLoginStudent = found;
+                document.getElementById('changePasswordForm').reset();
+                document.getElementById('changePasswordModal').classList.remove('hidden');
+                return;
+            }
+
+            completeStudentLogin(found);
+        }
+
+        function handlePasswordChangeSubmit(e) {
+            e.preventDefault();
+            const newPw = document.getElementById('newStudentPw').value.trim();
+            const confirmPw = document.getElementById('confirmStudentPw').value.trim();
+
+            if (!/^\d{4}$/.test(newPw)) {
+                showToast('비밀번호는 숫자 4자리로 입력해야 합니다.', 'error');
+                return;
+            }
+
+            if (newPw === "0000") {
+                showToast('새 비밀번호는 초기 비밀번호(0000)와 다르게 설정해야 합니다.', 'error');
+                return;
+            }
+
+            if (newPw !== confirmPw) {
+                showToast('비밀번호 확인이 일치하지 않습니다.', 'error');
+                return;
+            }
+
+            if (pendingLoginStudent) {
+                pendingLoginStudent.password = newPw;
+                const idx = studentsData.findIndex(s => String(s.id) === String(pendingLoginStudent.id));
+                if (idx !== -1) {
+                    studentsData[idx] = pendingLoginStudent;
+                    saveDataToStorage();
+                }
+
+                document.getElementById('changePasswordModal').classList.add('hidden');
+                showToast('비밀번호가 성공적으로 설정되었습니다!');
+                completeStudentLogin(pendingLoginStudent);
+                pendingLoginStudent = null;
+            }
+        }
+
+        function completeStudentLogin(student) {
+            currentRole = 'student';
+            currentStudent = student;
+            currentEvalTab = evalSchemas.length > 0 ? evalSchemas[0].key : '';
+            renderStudentDashboard();
+            showView('student');
+            showToast(`${student.name} 학생 본인 확인 완료`);
+        }
+
+        // Teacher Auth
+        function handleTeacherLogin(e) {
+            e.preventDefault();
+            const pwd = document.getElementById('teacherPassword').value;
+
+            if (pwd === TEACHER_SECRET) {
+                currentRole = 'teacher';
+                closeTeacherModal();
+                renderAdminTable();
+                renderAdminComments();
+                showView('teacher');
+                showToast('관리자 인증이 성공했습니다.');
+            } else {
+                showToast('교사 비밀번호가 일치하지 않습니다.', 'error');
+            }
+        }
+
+        function logout() {
+            currentRole = null;
+            currentStudent = null;
+            pendingLoginStudent = null;
+            document.getElementById('studentLoginForm').reset();
+            document.getElementById('teacherLoginForm').reset();
+            showView('home');
+            showToast('로그아웃 되었습니다.');
+        }
+
+        // RENDER: Student Dashboard & Evaluations
+        function renderStudentDashboard() {
+            if (!currentStudent) return;
+
+            document.getElementById('studentDisplayName').textContent = currentStudent.name;
+            document.getElementById('studentDisplayId').textContent = currentStudent.id;
+            document.getElementById('studentAvatar').textContent = currentStudent.name.slice(0, 1);
+
+            const tabsContainer = document.getElementById('studentEvalTabs');
+            tabsContainer.innerHTML = '';
+
+            if (evalSchemas.length === 0) {
+                document.getElementById('studentEvalContent').innerHTML = `<p class="text-slate-400 text-center py-6">등록된 평가 항목이 없습니다.</p>`;
+                return;
+            }
+
+            const validKeys = evalSchemas.map(s => s.key);
+            if (!validKeys.includes(currentEvalTab)) {
+                currentEvalTab = validKeys[0];
+            }
+
+            evalSchemas.forEach(schema => {
+                const btn = document.createElement('button');
+                btn.className = `pb-3 px-4 font-semibold text-sm transition whitespace-nowrap ${currentEvalTab === schema.key ? 'tab-active' : 'text-slate-500 hover:text-slate-800'}`;
+                btn.textContent = schema.name;
+                btn.onclick = () => {
+                    currentEvalTab = schema.key;
+                    renderStudentDashboard();
+                };
+                tabsContainer.appendChild(btn);
+            });
+
+            const activeSchema = evalSchemas.find(s => s.key === currentEvalTab);
+            const studentEvalData = (currentStudent.evaluations && currentStudent.evaluations[currentEvalTab]) || { scores: [], feedback: "" };
+            const contentArea = document.getElementById('studentEvalContent');
+            
+            let totalObtained = 0;
+            let totalMax = 0;
+            let subRowsHtml = '';
+
+            if (activeSchema && activeSchema.subNames) {
+                activeSchema.subNames.forEach((subName, idx) => {
+                    const score = (studentEvalData.scores && studentEvalData.scores[idx] !== undefined) ? studentEvalData.scores[idx] : 0;
+                    const max = activeSchema.maxes[idx] || 10;
+                    totalObtained += score;
+                    totalMax += max;
+
+                    const percent = max > 0 ? Math.round((score / max) * 100) : 0;
+                    subRowsHtml += `
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs font-bold text-slate-700">${subName}</span>
+                                <span class="text-sm font-extrabold text-indigo-600">${score} <span class="text-xs text-slate-400 font-normal">/ ${max}점</span></span>
+                            </div>
+                            <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                                <div class="bg-indigo-600 h-2 rounded-full transition-all duration-500" style="width: ${percent}%"></div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            const currentComment = (currentStudent.comments && currentStudent.comments[currentEvalTab]) || '';
+
+            contentArea.innerHTML = `
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-indigo-50/50 p-4 rounded-xl border border-indigo-100 gap-3">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-800">${activeSchema ? activeSchema.name : ''} 영역 결과</h3>
+                        <p class="text-xs text-slate-500">세부 영역별 성적 합계 및 평가 소평가 기준</p>
+                    </div>
+                    <div class="bg-indigo-600 text-white px-4 py-2 rounded-xl shadow-md text-right">
+                        <span class="text-xs text-indigo-200 block">이 영역 획득 점수</span>
+                        <span class="text-2xl font-black">${totalObtained} <span class="text-sm font-normal text-indigo-100">/ ${totalMax}점</span></span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    ${subRowsHtml}
+                </div>
+
+                <!-- Teacher Feedback -->
+                <div class="bg-slate-900 text-white p-5 rounded-xl space-y-2 border border-slate-800">
+                    <div class="flex items-center space-x-2 text-amber-400">
+                        <i data-lucide="message-square-quote" class="w-5 h-5"></i>
+                        <h4 class="font-bold text-sm">교사 종합 피드백</h4>
+                    </div>
+                    <p class="text-sm text-slate-300 leading-relaxed font-light">
+                        ${(studentEvalData && studentEvalData.feedback) ? studentEvalData.feedback : '등록된 피드백이 없습니다.'}
+                    </p>
+                </div>
+
+                <!-- Student Comment to Teacher -->
+                <div class="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-3">
+                    <div class="flex items-center space-x-2 text-slate-800">
+                        <i data-lucide="send" class="w-4 h-4 text-indigo-600"></i>
+                        <h4 class="font-bold text-sm">선생님께 남기는 질문 및 소감</h4>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <input type="text" id="studentCommentInput" value="${currentComment}" placeholder="선생님께 전하고 싶은 말씀이나 질문을 적어주세요." class="flex-grow px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <button onclick="saveStudentComment()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-medium text-sm transition shadow flex items-center justify-center space-x-1 shrink-0">
+                            <i data-lucide="save" class="w-4 h-4"></i>
+                            <span>저장</span>
+                        </button>
+                    </div>
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
+        // Save Student Comment
+        function saveStudentComment() {
+            if (!currentStudent) return;
+            const input = document.getElementById('studentCommentInput');
+            if (!input) return;
+
+            if (!currentStudent.comments) {
+                currentStudent.comments = {};
+            }
+
+            currentStudent.comments[currentEvalTab] = input.value.trim();
+
+            const idx = studentsData.findIndex(s => String(s.id) === String(currentStudent.id));
+            if (idx !== -1) {
+                studentsData[idx] = currentStudent;
+                saveDataToStorage();
+            }
+
+            showToast('소감/질문이 성공적으로 저장되었습니다.');
+        }
+
+        // Admin Tabs
+        function switchAdminTab(tab) {
+            const btnStudents = document.getElementById('adminTabBtn-students');
+            const btnComments = document.getElementById('adminTabBtn-comments');
+            const tabStudents = document.getElementById('adminTab-students');
+            const tabComments = document.getElementById('adminTab-comments');
+
+            if (tab === 'students') {
+                btnStudents.className = "pb-3 text-sm font-semibold border-b-2 border-indigo-600 text-indigo-600 flex items-center space-x-2";
+                btnComments.className = "pb-3 text-sm font-semibold text-slate-500 hover:text-slate-800 flex items-center space-x-2";
+                tabStudents.classList.remove('hidden');
+                tabComments.classList.add('hidden');
+            } else {
+                btnComments.className = "pb-3 text-sm font-semibold border-b-2 border-indigo-600 text-indigo-600 flex items-center space-x-2";
+                btnStudents.className = "pb-3 text-sm font-semibold text-slate-500 hover:text-slate-800 flex items-center space-x-2";
+                tabComments.classList.remove('hidden');
+                tabStudents.classList.add('hidden');
+                renderAdminComments();
+            }
+        }
+
+        // Render Admin Comments Tab
+        function renderAdminComments() {
+            const container = document.getElementById('studentCommentsList');
+            if (!container) return;
+            container.innerHTML = '';
+
+            let count = 0;
+            studentsData.forEach(student => {
+                if (!student.comments) return;
+
+                Object.keys(student.comments).forEach(evalKey => {
+                    const commentText = student.comments[evalKey];
+                    if (commentText && commentText.trim()) {
+                        count++;
+                        const schema = evalSchemas.find(s => s.key === evalKey);
+                        const evalName = schema ? schema.name : evalKey;
+                        
+                        const item = document.createElement('div');
+                        item.className = "p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2";
+                        item.innerHTML = `
+                            <div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="font-bold text-slate-800 text-sm">${student.name} (${student.id})</span>
+                                    <span class="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded font-medium">${evalName}</span>
+                                </div>
+                                <p class="text-xs text-slate-600 mt-1">"${commentText}"</p>
+                            </div>
+                        `;
+                        container.appendChild(item);
+                    }
+                });
+            });
+
+            const badge = document.getElementById('commentBadge');
+            if (badge) badge.textContent = count;
+
+            if (count === 0) {
+                container.innerHTML = `<p class="text-slate-400 text-center py-6 text-sm">학생들이 작성한 질문이나 소감이 아직 없습니다.</p>`;
+            }
+        }
+
+        // RENDER: Admin Dashboard Table
+        function renderAdminTable() {
+            const thead = document.getElementById('adminTableHeader');
+            const tbody = document.getElementById('adminTableBody');
+            const searchKeyword = document.getElementById('adminSearch').value.toLowerCase().trim();
+            tbody.innerHTML = '';
+            document.getElementById('selectAllCheckbox')?.remove();
+
+            // Build Dynamic Table Headers based on Eval Schemas
+            let headerHtml = `
+                <tr>
+                    <th class="p-3.5 pl-5 w-10">
+                        <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)" class="rounded border-slate-300">
+                    </th>
+                    <th class="p-3.5">학번</th>
+                    <th class="p-3.5">이름</th>
+                    <th class="p-3.5">비밀번호</th>
+            `;
+
+            evalSchemas.forEach(s => {
+                const maxSum = s.maxes.reduce((a,b)=>a+b, 0);
+                headerHtml += `<th class="p-3.5">${s.name} (${maxSum}점)</th>`;
+            });
+
+            headerHtml += `
+                    <th class="p-3.5">총점</th>
+                    <th class="p-3.5 text-center">관리</th>
+                </tr>
+            `;
+            thead.innerHTML = headerHtml;
+
+            const filtered = studentsData.filter(s => 
+                String(s.id).toLowerCase().includes(searchKeyword) || 
+                s.name.toLowerCase().includes(searchKeyword)
+            );
+
+            if (filtered.length === 0) {
+                const totalCols = 5 + evalSchemas.length;
+                tbody.innerHTML = `<tr><td colspan="${totalCols}" class="text-center py-8 text-slate-400">등록된 학생이 없거나 검색 결과가 없습니다.</td></tr>`;
+                return;
+            }
+
+            filtered.forEach(s => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition";
+
+                let rowEvalsHtml = '';
+                let grandTotal = 0;
+
+                evalSchemas.forEach(schema => {
+                    const studentEval = (s.evaluations && s.evaluations[schema.key]) || { scores: [] };
+                    const sum = (studentEval.scores || []).reduce((a,b)=>a+b, 0);
+                    const maxSum = schema.maxes.reduce((a,b)=>a+b, 0);
+                    grandTotal += sum;
+                    rowEvalsHtml += `<td class="p-3.5"><span class="bg-slate-100 px-2 py-1 rounded text-xs font-semibold">${sum} / ${maxSum}</span></td>`;
+                });
+
+                tr.innerHTML = `
+                    <td class="p-3.5 pl-5">
+                        <input type="checkbox" class="student-select-checkbox rounded border-slate-300" value="${s.id}">
+                    </td>
+                    <td class="p-3.5 font-semibold text-slate-900">${s.id}</td>
+                    <td class="p-3.5 font-medium">${s.name}</td>
+                    <td class="p-3.5">
+                        <div class="flex items-center space-x-1.5">
+                            <span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-xs font-mono font-bold border border-indigo-200">${s.password || '0000'}</span>
+                            <button onclick="resetStudentPassword('${s.id}')" class="text-[11px] text-slate-500 hover:text-amber-600 underline" title="비밀번호 0000으로 초기화">초기화</button>
+                        </div>
+                    </td>
+                    ${rowEvalsHtml}
+                    <td class="p-3.5 font-bold text-indigo-600">${grandTotal}점</td>
+                    <td class="p-3.5 text-center">
+                        <div class="flex items-center justify-center space-x-2">
+                            <button onclick="openEditStudentModal('${s.id}')" class="p-1.5 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="수정">
+                                <i data-lucide="edit-3" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="deleteSingleStudent('${s.id}')" class="p-1.5 text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition" title="삭제">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        // EVALUATION CONFIGURATION MODAL LOGIC
+        let tempSchemas = [];
+
+        function openConfigModal() {
+            tempSchemas = JSON.parse(JSON.stringify(evalSchemas));
+            renderConfigModalList();
+            document.getElementById('configModal').classList.remove('hidden');
+        }
+
+        function closeConfigModal() {
+            document.getElementById('configModal').classList.add('hidden');
+        }
+
+        function renderConfigModalList() {
+            const container = document.getElementById('configEvalsList');
+            container.innerHTML = '';
+
+            tempSchemas.forEach((schema, sIdx) => {
+                const card = document.createElement('div');
+                card.className = "bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 relative";
+                
+                let subItemsHtml = '';
+                schema.subNames.forEach((subName, subIdx) => {
+                    const maxVal = schema.maxes[subIdx] || 10;
+                    subItemsHtml += `
+                        <div class="flex items-center space-x-2">
+                            <input type="text" value="${subName}" onchange="updateTempSubName(${sIdx}, ${subIdx}, this.value)" placeholder="항목명 (예: 내용이해)" class="flex-grow px-2.5 py-1.5 border border-slate-300 rounded text-xs">
+                            <div class="flex items-center space-x-1 shrink-0">
+                                <span class="text-xs text-slate-400">만점:</span>
+                                <input type="number" min="1" max="100" value="${maxVal}" onchange="updateTempSubMax(${sIdx}, ${subIdx}, this.value)" class="w-16 px-2 py-1 border border-slate-300 rounded text-xs text-center">
+                            </div>
+                            <button onclick="removeTempSubItem(${sIdx}, ${subIdx})" class="text-rose-500 hover:text-rose-700 p-1" title="항목 삭제">
+                                <i data-lucide="minus-circle" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    `;
+                });
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-center gap-2">
+                        <input type="text" value="${schema.name}" onchange="updateTempSchemaName(${sIdx}, this.value)" placeholder="평가 영역 이름 (예: [1차] 독서록 작성)" class="font-bold text-sm text-slate-800 bg-white border border-slate-300 px-3 py-1.5 rounded-lg w-full">
+                        <button onclick="removeTempSchema(${sIdx})" class="text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg border border-rose-200 shrink-0 flex items-center space-x-1 text-xs font-semibold">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                            <span>영역 삭제</span>
+                        </button>
+                    </div>
+
+                    <div class="space-y-2 pt-1">
+                        <span class="text-xs font-semibold text-slate-500 block">세부 평가 요소 및 만점 설정</span>
+                        <div class="space-y-2">
+                            ${subItemsHtml}
+                        </div>
+                        <button onclick="addTempSubItem(${sIdx})" class="text-xs text-indigo-600 hover:underline font-semibold flex items-center space-x-1 pt-1">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                            <span>세부 항목 추가</span>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+            lucide.createIcons();
+        }
+
+        function updateTempSchemaName(sIdx, value) {
+            tempSchemas[sIdx].name = value.trim();
+        }
+
+        function updateTempSubName(sIdx, subIdx, value) {
+            tempSchemas[sIdx].subNames[subIdx] = value.trim();
+        }
+
+        function updateTempSubMax(sIdx, subIdx, value) {
+            tempSchemas[sIdx].maxes[subIdx] = Number(value) || 10;
+        }
+
+        function addTempSubItem(sIdx) {
+            tempSchemas[sIdx].subNames.push(`새 세부항목 ${tempSchemas[sIdx].subNames.length + 1}`);
+            tempSchemas[sIdx].maxes.push(10);
+            renderConfigModalList();
+        }
+
+        function removeTempSubItem(sIdx, subIdx) {
+            if (tempSchemas[sIdx].subNames.length <= 1) {
+                showToast('최소 한 개의 세부 항목이 필요합니다.', 'error');
+                return;
+            }
+            tempSchemas[sIdx].subNames.splice(subIdx, 1);
+            tempSchemas[sIdx].maxes.splice(subIdx, 1);
+            renderConfigModalList();
+        }
+
+        function addNewEvalSchema() {
+            const nextNum = tempSchemas.length + 1;
+            tempSchemas.push({
+                key: `eval_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+                name: `[${nextNum}차] 새로운 수행평가`,
+                subNames: ["항목 1", "항목 2"],
+                maxes: [10, 10]
+            });
+            renderConfigModalList();
+        }
+
+        function removeTempSchema(sIdx) {
+            if (tempSchemas.length <= 1) {
+                showToast('최소 한 개 이상의 평가 영역이 필요합니다.', 'error');
+                return;
+            }
+            tempSchemas.splice(sIdx, 1);
+            renderConfigModalList();
+        }
+
+        function saveEvalSchemaConfig() {
+            evalSchemas = JSON.parse(JSON.stringify(tempSchemas));
+            saveDataToStorage();
+            closeConfigModal();
+            renderAdminTable();
+            renderAdminComments();
+            showToast('평가 영역 설정이 업데이트되었습니다.');
+        }
+
+        // Student Modal (Add / Edit) Dynamic Population
+        function openAddStudentModal() {
+            document.getElementById('modalTitle').textContent = "학생 개별 추가";
+            document.getElementById('editOriginalId').value = "";
+            document.getElementById('studentModalForm').reset();
+            document.getElementById('modalStudentPassword').value = "0000";
+
+            renderModalEvalsContainer();
+            document.getElementById('studentModal').classList.remove('hidden');
+        }
+
+        function openEditStudentModal(sid) {
+            const targetId = String(sid);
+            const student = studentsData.find(s => String(s.id) === targetId);
+            if (!student) return;
+
+            document.getElementById('modalTitle').textContent = "학생 정보 및 성적 수정";
+            document.getElementById('editOriginalId').value = student.id;
+            document.getElementById('modalStudentId').value = student.id;
+            document.getElementById('modalStudentName').value = student.name;
+            document.getElementById('modalStudentPassword').value = student.password || "0000";
+
+            renderModalEvalsContainer(student);
+            document.getElementById('studentModal').classList.remove('hidden');
+        }
+
+        function renderModalEvalsContainer(student = null) {
+            const container = document.getElementById('modalEvalsContainer');
+            container.innerHTML = '';
+
+            evalSchemas.forEach(schema => {
+                const sData = (student && student.evaluations && student.evaluations[schema.key]) || { scores: [], feedback: "" };
+                
+                let subFieldsHtml = '';
+                schema.subNames.forEach((subName, subIdx) => {
+                    const maxVal = schema.maxes[subIdx] || 10;
+                    const val = (sData.scores && sData.scores[subIdx] !== undefined) ? sData.scores[subIdx] : 0;
+                    subFieldsHtml += `
+                        <div>
+                            <span class="text-xs text-slate-500">${subName}(${maxVal})</span>
+                            <input type="number" data-schema="${schema.key}" data-subidx="${subIdx}" max="${maxVal}" min="0" value="${val}" class="m-eval-score w-full px-2 py-1 border rounded text-sm">
+                        </div>
+                    `;
+                });
+
+                const evalBox = document.createElement('div');
+                evalBox.className = "p-3 bg-slate-50 rounded-xl space-y-2 border border-slate-200";
+                evalBox.innerHTML = `
+                    <h4 class="text-xs font-bold text-indigo-700 uppercase">${schema.name}</h4>
+                    <div class="grid grid-cols-3 gap-2">
+                        ${subFieldsHtml}
+                    </div>
+                    <div>
+                        <span class="text-xs text-slate-500">교사 피드백</span>
+                        <input type="text" data-schema-fb="${schema.key}" value="${sData.feedback || ''}" class="m-eval-fb w-full px-2 py-1 border rounded text-sm placeholder-slate-400" placeholder="피드백 입력">
+                    </div>
+                `;
+                container.appendChild(evalBox);
+            });
+        }
+
+        function closeModal() {
+            document.getElementById('studentModal').classList.add('hidden');
+        }
+
+        function saveStudentModal(e) {
+            e.preventDefault();
+
+            const origId = document.getElementById('editOriginalId').value;
+            const newId = document.getElementById('modalStudentId').value.trim();
+            const name = document.getElementById('modalStudentName').value.trim();
+            const password = document.getElementById('modalStudentPassword').value.trim() || "0000";
+
+            let studentObj = origId ? studentsData.find(s => String(s.id) === String(origId)) : null;
+
+            if (!studentObj) {
+                studentObj = {
+                    id: newId,
+                    name: name,
+                    password: password,
+                    evaluations: {},
+                    comments: {}
+                };
+                studentsData.push(studentObj);
+            } else {
+                studentObj.id = newId;
+                studentObj.name = name;
+                studentObj.password = password;
+            }
+
+            if (!studentObj.evaluations) studentObj.evaluations = {};
+
+            // Collect dynamic scores and feedback
+            evalSchemas.forEach(schema => {
+                const scoreInputs = document.querySelectorAll(`.m-eval-score[data-schema="${schema.key}"]`);
+                const fbInput = document.querySelector(`.m-eval-fb[data-schema-fb="${schema.key}"]`);
+
+                const scores = [];
+                scoreInputs.forEach(input => {
+                    scores.push(Number(input.value) || 0);
+                });
+
+                studentObj.evaluations[schema.key] = {
+                    scores: scores,
+                    feedback: fbInput ? fbInput.value.trim() : ""
+                };
+            });
+
+            saveDataToStorage();
+            closeModal();
+            renderAdminTable();
+            renderAdminComments();
+            showToast('학생 정보가 저장되었습니다.');
+        }
+
+        // Excel Sample Download
+        function downloadSampleExcel() {
+            const headers = ["학번", "이름", "비밀번호(선택)"];
+
+            evalSchemas.forEach(schema => {
+                schema.subNames.forEach((subName, subIdx) => {
+                    const maxVal = schema.maxes[subIdx] || 10;
+                    headers.push(`${schema.name}_${subName}(${maxVal})`);
+                });
+                headers.push(`${schema.name}_피드백`);
+            });
+
+            const row1 = ["10101", "김민준", "0000"];
+            const row2 = ["10102", "이서연", "1234"];
+
+            evalSchemas.forEach(schema => {
+                schema.subNames.forEach(() => row1.push(10));
+                row1.push("우수한 성과를 보임");
+                schema.subNames.forEach(() => row2.push(9));
+                row2.push("성실히 참여함");
+            });
+
+            const data = [headers, row1, row2];
+
+            const ws = XLSX.utils.aoa_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "수행평가양식");
+            XLSX.writeFile(wb, "수행평가_성적입력_양식.xlsx");
+        }
+
+        // Student Deletion Logic
+        function deleteSingleStudent(sid) {
+            const targetId = String(sid);
+            const student = studentsData.find(s => String(s.id) === targetId);
+            const name = student ? student.name : targetId;
+            
+            showCustomConfirm(
+                '학생 정보 삭제',
+                `정말로 학번 [${targetId}] (${name}) 학생을 삭제하시겠습니까?`,
+                '삭제하기',
+                function() {
+                    studentsData = studentsData.filter(s => String(s.id) !== targetId);
+                    saveDataToStorage();
+                    renderAdminTable();
+                    renderAdminComments();
+                    showToast('학생 정보가 성공적으로 삭제되었습니다.');
+                }
+            );
+        }
+
+        function toggleSelectAll(masterCheckbox) {
+            const checkboxes = document.querySelectorAll('.student-select-checkbox');
+            checkboxes.forEach(cb => cb.checked = masterCheckbox.checked);
+        }
+
+        function deleteSelectedStudents() {
+            const selectedBoxes = document.querySelectorAll('.student-select-checkbox:checked');
+            if (selectedBoxes.length === 0) {
+                showToast('삭제할 학생을 선택해 주세요.', 'error');
+                return;
+            }
+
+            const selectedIds = Array.from(selectedBoxes).map(cb => String(cb.value));
+
+            showCustomConfirm(
+                '선택 삭제 확인',
+                `선택한 ${selectedIds.length}명의 학생을 삭제하시겠습니까?`,
+                '일괄 삭제',
+                function() {
+                    studentsData = studentsData.filter(s => !selectedIds.includes(String(s.id)));
+                    saveDataToStorage();
+                    renderAdminTable();
+                    renderAdminComments();
+                    showToast(`${selectedIds.length}명의 학생 정보가 삭제되었습니다.`);
+                }
+            );
+        }
+
+        function resetStudentPassword(sid) {
+            const student = studentsData.find(s => String(s.id) === String(sid));
+            if (!student) return;
+
+            showCustomConfirm(
+                '비밀번호 초기화',
+                `${student.name}(${sid}) 학생의 비밀번호를 초기 비밀번호 '0000'으로 리셋하시겠습니까?`,
+                '초기화',
+                function() {
+                    student.password = "0000";
+                    saveDataToStorage();
+                    renderAdminTable();
+                    showToast('비밀번호가 0000으로 초기화되었습니다.');
+                }
+            );
+        }
+
+        // Excel Upload Handling
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                    if (jsonData.length < 2) {
+                        showToast('엑셀 파일에 데이터가 존재하지 않습니다.', 'error');
+                        return;
+                    }
+
+                    let importedCount = 0;
+                    for (let i = 1; i < jsonData.length; i++) {
+                        const row = jsonData[i];
+                        if (!row[0] || !row[1]) continue;
+
+                        const studentId = String(row[0]).trim();
+                        const studentName = String(row[1]).trim();
+                        const studentPw = row[2] ? String(row[2]).trim() : "0000"; 
+
+                        const parsedStudent = {
+                            id: studentId,
+                            name: studentName,
+                            password: studentPw,
+                            evaluations: {},
+                            comments: {}
+                        };
+
+                        let colIdx = 3;
+                        evalSchemas.forEach(schema => {
+                            const scores = [];
+                            schema.subNames.forEach(() => {
+                                scores.push(Number(row[colIdx]) || 0);
+                                colIdx++;
+                            });
+                            const feedback = row[colIdx] ? String(row[colIdx]) : "";
+                            colIdx++;
+
+                            parsedStudent.evaluations[schema.key] = {
+                                scores: scores,
+                                feedback: feedback
+                            };
+                        });
+
+                        const existingIdx = studentsData.findIndex(s => String(s.id) === studentId);
+                        if (existingIdx !== -1) {
+                            studentsData[existingIdx] = parsedStudent;
+                        } else {
+                            studentsData.push(parsedStudent);
+                        }
+                        importedCount++;
+                    }
+
+                    saveDataToStorage();
+                    renderAdminTable();
+                    renderAdminComments();
+                    showToast(`${importedCount}명의 학생 명단 및 성적 정보가 업로드되었습니다.`);
+                    event.target.value = '';
+                } catch(err) {
+                    console.error(err);
+                    showToast('엑셀 파일 분석 중 오류가 발생했습니다.', 'error');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Notification Toast
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMsg.textContent = message;
+            
+            if (type === 'error') {
+                toastIcon.setAttribute('data-lucide', 'alert-circle');
+                toastIcon.className = "w-5 h-5 text-rose-400";
+            } else {
+                toastIcon.setAttribute('data-lucide', 'check-circle');
+                toastIcon.className = "w-5 h-5 text-emerald-400";
+            }
+            lucide.createIcons();
+
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
